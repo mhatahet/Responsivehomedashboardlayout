@@ -1,0 +1,270 @@
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { DateRangePreset } from './DateRangeSelector';
+import { CycleType } from './CycleSelector';
+import { RefreshCw, Download, Info, Loader2, Filter } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+
+const data = [
+  { month: 'Jan', sales: 45000, target: 50000 },
+  { month: 'Feb', sales: 52000, target: 50000 },
+  { month: 'Mar', sales: 48000, target: 50000 },
+  { month: 'Apr', sales: 61000, target: 55000 },
+  { month: 'May', sales: 58000, target: 55000 },
+  { month: 'Jun', sales: 67000, target: 60000 },
+  { month: 'Jul', sales: 73000, target: 65000 },
+  { month: 'Aug', sales: 71000, target: 65000 },
+  { month: 'Sep', sales: 78000, target: 70000 },
+  { month: 'Oct', sales: 82000, target: 75000 },
+  { month: 'Nov', sales: 86000, target: 80000 },
+  { month: 'Dec', sales: 91000, target: 85000 },
+];
+
+interface SalesChartProps {
+  dateRange: DateRangePreset;
+  cycle: CycleType;
+  customStartDate?: string;
+  customEndDate?: string;
+}
+
+export function SalesChart({ dateRange, cycle, customStartDate, customEndDate }: SalesChartProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+      if (infoRef.current && !infoRef.current.contains(event.target as Node)) {
+        setShowInfo(false);
+      }
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setShowFilterMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getTimeAgo = () => {
+    const seconds = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return 'Updated a few seconds ago';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `Updated ${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Updated ${hours} hour${hours > 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `Updated ${days} day${days > 1 ? 's' : ''} ago`;
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    setIsRefreshing(false);
+    setLastUpdated(new Date());
+  };
+
+  const handleExportCSV = () => {
+    const csvContent = 'Month,Sales,Target\n' + 
+      data.map(row => `${row.month},${row.sales},${row.target}`).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sales-trends.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  const handleExportImage = async () => {
+    if (chartRef.current) {
+      // In a real app, you would use html2canvas or similar
+      alert('Image export would capture the chart visualization');
+    }
+    setShowExportMenu(false);
+  };
+
+  const getDateRangeLabel = () => {
+    if (dateRange === 'custom' && customStartDate && customEndDate) {
+      const start = new Date(customStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const end = new Date(customEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `${start} - ${end}`;
+    }
+    switch (dateRange) {
+      case 'today': return 'Today';
+      case 'week': return 'This Week';
+      case 'month': return 'This Month';
+      case 'year': return 'This Year';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl p-6 border border-neutral-200 relative" ref={chartRef}>
+      <div className="mb-6">
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="text-neutral-900">Sales Trends</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">
+              {getDateRangeLabel()}
+            </span>
+            <span className="text-xs px-2 py-1 bg-neutral-100 text-neutral-600 rounded capitalize">
+              {cycle}
+            </span>
+            
+            {/* Action buttons - always visible with background */}
+            <div className="flex items-center gap-1 bg-neutral-50 rounded-lg p-1 border border-neutral-100 shadow-sm ml-2">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-1.5 hover:bg-white rounded-md transition-colors disabled:opacity-50"
+                title="Refresh data"
+              >
+                {isRefreshing ? (
+                  <Loader2 className="w-4 h-4 text-neutral-600 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-neutral-600" />
+                )}
+              </button>
+              
+              <div className="relative" ref={filterMenuRef}>
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className="p-1.5 hover:bg-white rounded-md transition-colors"
+                  title="Filter data"
+                >
+                  <Filter className="w-4 h-4 text-neutral-600" />
+                </button>
+                
+                {showFilterMenu && (
+                  <div className="absolute top-full right-0 mt-1 w-44 bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
+                    <button
+                      onClick={() => setShowFilterMenu(false)}
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors rounded-t-lg"
+                    >
+                      Show All Months
+                    </button>
+                    <button
+                      onClick={() => setShowFilterMenu(false)}
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                    >
+                      Above Target
+                    </button>
+                    <button
+                      onClick={() => setShowFilterMenu(false)}
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors rounded-b-lg"
+                    >
+                      Below Target
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="p-1.5 hover:bg-white rounded-md transition-colors"
+                  title="Export data"
+                >
+                  <Download className="w-4 h-4 text-neutral-600" />
+                </button>
+                
+                {showExportMenu && (
+                  <div className="absolute top-full right-0 mt-1 w-40 bg-white border border-neutral-200 rounded-lg shadow-lg z-50">
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors rounded-t-lg"
+                    >
+                      Export as CSV
+                    </button>
+                    <button
+                      onClick={handleExportImage}
+                      className="w-full text-left px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors rounded-b-lg"
+                    >
+                      Export as Image
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={infoRef}>
+                <button
+                  onClick={() => setShowInfo(!showInfo)}
+                  className="p-1.5 hover:bg-white rounded-md transition-colors"
+                  title="Information"
+                >
+                  <Info className="w-4 h-4 text-neutral-600" />
+                </button>
+                
+                {showInfo && (
+                  <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-neutral-200 rounded-lg shadow-lg z-50 p-3">
+                    <p className="text-xs text-neutral-600">{getTimeAgo()}</p>
+                    <p className="text-xs text-neutral-400 mt-1">Last refreshed: {lastUpdated.toLocaleTimeString()}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-neutral-500">Monthly performance overview</p>
+          <p className="text-xs text-neutral-400">{getTimeAgo()}</p>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+          <XAxis 
+            dataKey="month" 
+            stroke="#737373"
+            tick={{ fill: '#737373' }}
+          />
+          <YAxis 
+            stroke="#737373"
+            tick={{ fill: '#737373' }}
+            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+          />
+          <Tooltip 
+            contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #e5e5e5',
+              borderRadius: '8px',
+            }}
+            formatter={(value: number) => `$${value.toLocaleString()}`}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="sales" 
+            stroke="#2563eb" 
+            strokeWidth={2}
+            dot={{ fill: '#2563eb', r: 4 }}
+            activeDot={{ r: 6 }}
+            name="Sales"
+          />
+          <Line 
+            type="monotone" 
+            dataKey="target" 
+            stroke="#94a3b8" 
+            strokeWidth={2}
+            strokeDasharray="5 5"
+            dot={false}
+            name="Target"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
